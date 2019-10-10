@@ -650,6 +650,34 @@ impl Ctx {
         }
     }
 
+    pub fn set_pin_raw<'a, 'b>(
+        &self,
+        session: CK_SESSION_HANDLE,
+        old_pin: Option<&[CK_BYTE]>,
+        new_pin: Option<&'b str>,
+    ) -> Result<(), Error> {
+        self.initialized()?;
+        if old_pin.is_none() && new_pin.is_none() {
+            match (self.C_SetPIN)(session, ptr::null_mut(), 0, ptr::null_mut(), 0) {
+                CKR_OK => Ok(()),
+                err => Err(Error::Pkcs11(err)),
+            }
+        } else if old_pin.is_some() && new_pin.is_some() {
+            let new_cpin_res = CString::new(new_pin.unwrap());
+            if new_cpin_res.is_err() {
+                return Err(Error::InvalidInput("New PIN contains a nul byte"));
+            }
+            let mut old_cpin = old_pin.unwrap().to_vec();
+            let mut new_cpin = new_cpin_res.unwrap().into_bytes();
+            match (self.C_SetPIN)(session, old_cpin.as_mut_ptr(), old_cpin.len() as CK_ULONG, new_cpin.as_mut_ptr(), new_cpin.len() as CK_ULONG) {
+                CKR_OK => Ok(()),
+                err => Err(Error::Pkcs11(err)),
+            }
+        } else {
+            Err(Error::InvalidInput("both PINs must be either set or unset"))
+        }
+    }
+
     pub fn open_session(
         &self,
         slot_id: CK_SLOT_ID,
