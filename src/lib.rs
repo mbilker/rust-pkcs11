@@ -654,7 +654,7 @@ impl Ctx {
         &self,
         session: CK_SESSION_HANDLE,
         old_pin: Option<&[CK_BYTE]>,
-        new_pin: Option<&'b str>,
+        new_pin: Option<&[CK_BYTE]>,
     ) -> Result<(), Error> {
         self.initialized()?;
         if old_pin.is_none() && new_pin.is_none() {
@@ -663,13 +663,15 @@ impl Ctx {
                 err => Err(Error::Pkcs11(err)),
             }
         } else if old_pin.is_some() && new_pin.is_some() {
-            let new_cpin_res = CString::new(new_pin.unwrap());
-            if new_cpin_res.is_err() {
-                return Err(Error::InvalidInput("New PIN contains a nul byte"));
-            }
             let mut old_cpin = old_pin.unwrap().to_vec();
-            let mut new_cpin = new_cpin_res.unwrap().into_bytes();
-            match (self.C_SetPIN)(session, old_cpin.as_mut_ptr(), old_cpin.len() as CK_ULONG, new_cpin.as_mut_ptr(), new_cpin.len() as CK_ULONG) {
+            let mut new_cpin = new_pin.unwrap().to_vec();
+            match (self.C_SetPIN)(
+                session,
+                old_cpin.as_mut_ptr(),
+                old_cpin.len() as CK_ULONG,
+                new_cpin.as_mut_ptr(),
+                new_cpin.len() as CK_ULONG,
+            ) {
                 CKR_OK => Ok(()),
                 err => Err(Error::Pkcs11(err)),
             }
